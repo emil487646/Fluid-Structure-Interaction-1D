@@ -1,0 +1,11 @@
+*.o
+*.so
+*.pyc
+*.depend
+*.layout
+*.cbp
+/ddm/build/
+/ddm/dist/
+/ddm/nbproject/private/
+/example/build/
+/example/dist/
