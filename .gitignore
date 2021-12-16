@@ -4,6 +4,7 @@
 *.depend
 *.layout
 *.cbp
+*.mp4
 /ddm/build/
 /ddm/dist/
 /ddm/nbproject/private/

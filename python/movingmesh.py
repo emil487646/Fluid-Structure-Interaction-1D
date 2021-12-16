@@ -46,31 +46,41 @@ class Mesh:
         return np.array([self.cells[n].mid for n in range(N)])
 gamma=7./5.
 c=1
+def pf(rhoE, rho, u):
+    return (gamma-1)*(rhoE-0.5*rho*u**2)
 def z(t):
     return 1+0.1*np.sin(10*np.pi*t)
 def f(w):
     rho=w[0]
     u=w[1]/rho
+    rhou=w[1]
     rhoE=w[2]
-    p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
+    # p=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u)**2
+    p=pf(rhoE, rho, u)
     return w*u+np.array([0, p, p*u])
 def ft(w, v):
     rho=w[0]
     u=w[1]/rho
+    rhou=w[1]
     rhoE=w[2]
-    p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
+    # p=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u)**2
+    p=pf(rhoE, rho, u)
     return w*(u-v)+np.array([0, p, p*u])
 def f_num(wl, wr, v, n):
     rhol=wl[0]
     ul=wl[1]/rhol
+    rhoul=wl[1]
     rhoEl=wl[2]
-    pl=(gamma-1)*rhoEl-0.5*rhol*np.abs(ul)**2
+    # pl=(gamma-1)*rhoEl-0.5*(gamma-1)*rhol*np.abs(ul)**2
+    pl=pf(rhoEl, rhol, ul)
     cl=np.sqrt(gamma*pl/rhol)
     
     rhor=wr[0]
     ur=wr[1]/rhor
+    rhour=wr[1]
     rhoEr=wr[2]
-    pr=(gamma-1)*rhoEr-0.5*rhor*np.abs(ur)**2
+    # pr=(gamma-1)*rhoEr-0.5*(gamma-1)*rhor*np.abs(ur)**2
+    pr=pf(rhoEr, rhor, ur)
     cr=np.sqrt(gamma*pr/rhor)
     
     A=np.abs(np.array([ul*n-v, ul*n+cl-v, ul*n-cl-v, ur*n-v, ur*n+cr-v, ur*n-cr-v]))
@@ -90,11 +100,15 @@ def solve(N, M, T):
     dt=T/M
     tvec=np.linspace(0, T, M+1)
     u=np.zeros((M+1, N, 3))
+    p=np.zeros((M+1, N))
+    utot=np.zeros((M+1, 3))
     x=np.zeros((M+1, N))
     x[0,:]=mesh.midpoints()
     u[0,:,0]=1
     u[0,:,1]=0
     u[0,:,2]=2.5
+    utot[0]=mesh.cells[0].volume*np.sum(u[0], axis=0)
+    p[0]=pf(u[0,:,2], u[0,:,0], u[0,:,0]*u[0,:,1])
     for m in range(1, M+1):
         print("m=", m)
         t=tvec[m]
@@ -111,6 +125,11 @@ def solve(N, M, T):
         #Initilize the new values to the values at the previous time step
         # u[m, :, :]=[u[m-1, k, :] for k in range(N)]
         
+        
+        cell0=mesh.cells[0]
+        # u[m, 0,:]+=dt*f_num(np.array([u[m-1, 0, 0], -u[m-1, 0, 1], u[m-1, 0, 2]]), u[m-1, 0], cell0.vl,1)/cell0.volume
+        u[m, 0,:]+=dt*f(np.array([u[m-1, 0, 0], 0, u[m-1, 0, 2]]))/cell0.volume
+        # u[m, 0,:]+=dt*np.array([0, p[m-1, 0], 0])/cell0.volume
         #Loop over the edges
         for n in range(N-1):
             celll=mesh.cells[n]
@@ -121,10 +140,27 @@ def solve(N, M, T):
             #Update values
             u[m,n,:]-=dt*flux/celll.volume
             u[m,n+1,:]+=dt*flux/cellr.volume
-        u[m, 0, 1]=0
+        cellf=mesh.cells[N-1]
+        # u[m, N-1,:]-=dt*f_num(u[m-1, N-1], u[m-1, N-1], cellf.vr,1)/cellf.volume
+        # u[m, N-1,:]-=dt*f(u[m-1, N-1])/cellf.volume
+        # u[m, N-1,:]-=dt*f(np.array([u[m-1, N-1, 0], mesh.cells[N-1].vr, u[m-1, N-1, 2]]))/cellf.volume
+        
+        # u[m, 0, 1]=0
         # u[m, N-1, 1]=0
-        u[m, N-1, 1]=mesh.cells[N-1].vr
-    return tvec, x, u
+        # u[m, N-1,:]-=dt*f_num(u[m-1, N-1]-np.array([0, cellf.vr, 0]), np.array([u[m-1, N-1, 0], -u[m-1, N-1, 1], u[m-1, N-1, 2]]), cellf.vr, 1)/cellf.volume
+        # u[m, N-1, 1]=mesh.cells[N-1].vr
+        # u[m, N-1,:]-=dt*np.array([0, p[m-1, 0], p[m-1, 0]*cellf.vr])/cellf.volume
+        # u[m, N-1,:]-=dt*f(np.array([u[m-1, N-1, 0], u[m-1, N-1, 0]*cellf.vr, u[m-1, N-1, 2]]))/cellf.volume
+        u[m, N-1,:]-=dt*ft(np.array([u[m-1, N-1, 0], cellf.vr*u[m-1, N-1, 0], u[m-1, N-1, 2]]), cellf.vr)/cellf.volume
+        
+        utot[m]=mesh.cells[0].volume*np.sum(u[m], axis=0)
+        
+        rho=u[m, :, 0]
+        u1=u[m, :, 1]/rho
+        v=np.array([(mesh.cells[k].vl+mesh.cells[k].vr)/2 for k in range(N)])
+        rhoE=u[m, :, 2]
+        p[m]=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u1)**2
+    return tvec, x, u, utot, p
         
 
 # t=0
@@ -153,12 +189,12 @@ def solve(N, M, T):
 #                     init_func=init, blit=True)
 # plt.show()
 
-N=50
-M=10000
+N=20
+M=20000
 # N=10
 # M=400
-T=5.
-t, x, w=solve(N, M, T)
+T=5
+t, x, w, wtot, p=solve(N, M, T)
 dt=T/M
 fig, ax = plt.subplots()
 xdata, ydata = [], []
@@ -169,8 +205,14 @@ ln3, = plt.plot([], [], 'k-')
 rho=w[:, :, 0]
 u=w[:, :, 1]/rho
 rhoE=w[:, :, 2]
-p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
+# p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
+
+# plt.plot(t, wtot[:])
 plt.legend(['rho', 'u', 'p'], loc='upper left')
+#Frames per second in video
+fps=60
+#Time units per second in video
+tps=12
 time = plt.text(0.5,1.8, str(0), ha="left", va="top")
 
 def init():
@@ -181,18 +223,32 @@ def init():
 def update(frame):
     # plt.plot(mesh.midpoints(), np.ones(N), '*')
     # print(frame)
-    ln0.set_data(x[frame,:], rho[frame, :])
-    ln1.set_data(x[frame,:], u[frame, :])
-    ln2.set_data(x[frame,:], p[frame, :])
-    ln3.set_data([x[frame,-1], x[frame, -1]], [-0.5, 2])
+    
+    # i=frame
+    i=0
+    while i<len(t)-1 and t[i]<frame/fps/tps:
+        i=i+1
+    
+    ln0.set_data(x[i,:], rho[i, :])
+    ln1.set_data(x[i,:], u[i, :])
+    ln2.set_data(x[i,:], p[i, :])
+    ln3.set_data([x[i,-1], x[i, -1]], [-0.5, 2])
     # plt.title('t='+str(t[frame]))
-    tt=t[frame]
+    tt=t[i]
     time.set_text(f't={tt:.2f}')
     return ln0, ln1, ln2, ln3, time
 
-ani = FuncAnimation(fig, update, frames=np.array(range(M)),
+# ani = FuncAnimation(fig, update, frames=np.array(range(M)),
+#                     init_func=init, blit=True, repeat=True)
+# plt.show()
+# f = "animation4.mp4" 
+# writergif = FFMpegWriter(fps=int(M/T/12), bitrate=-1)
+# ani.save(f, writer=writergif)
+
+ani = FuncAnimation(fig, update, frames=np.array(tps*fps*T),
                     init_func=init, blit=True, repeat=True)
+    
 plt.show()
 f = "animation4.mp4" 
-writergif = FFMpegWriter(fps=int(M/T/12), bitrate=-1)
+writergif = FFMpegWriter(fps=fps, bitrate=-1)
 ani.save(f, writer=writergif)
