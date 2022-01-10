@@ -25,7 +25,7 @@ class Mesh:
         self.xf=xf
         self.z0=xf
     def update(self, xf_new, dt):
-        print(xf_new)
+        # print(xf_new)
         xf_old=self.xf
         # xf_old=self.cells0[0].xl
         x0=self.x0
@@ -53,6 +53,8 @@ def z(t):
     return 0.9+0.1*np.cos(10*np.pi*t)
 def zp(t):
     return -np.pi*np.sin(10*np.pi*t)
+def zpp(t):
+    return -10*np.pi**2*np.cos(10*np.pi*t)
 # def z(t):
 #     return 1
 # def zp(t):
@@ -104,7 +106,46 @@ def f_num(wl, wr, v, n):
 N=5
 M=1000
 # mesh=Mesh(0., 1., N)
-
+def step(mesh, w_m, t_m, v_m, a_m):
+    N=mesh.N
+    
+    upd=np.zeros((N, 3))
+    lmaxmax=0
+        
+    cell0=mesh.cells[0]
+    flux=np.array([0, (gamma-1)*w_m[0, 2], 0])
+    upd[0,:]+=flux
+    # print((gamma-1)*u[m-1, 0, 2])
+    # print(flux)
+    #Loop over the edges
+    # upd+=np.array([])
+    
+    # upd[0:-1]-=np.array([f_num(u[m-1, n], u[m-1, n+1], mesh.cells[n].vr, 1)[0] for n in range(N-1)])
+    # upd[1:]+=np.array([f_num(u[m-1, n], u[m-1, n+1], mesh.cells[n].vr, 1)[0] for n in range(N-1)])
+    for n in range(N-1):
+        celll=mesh.cells[n]
+        cellr=mesh.cells[n+1]
+        #Approximate the flux by the numerical flux times the edge length
+        #Note that celll.vr=cellr.vl
+        # print("n=", n)
+        flux, lmax=f_num(w_m[n], w_m[n+1], celll.vr, 1)*1
+        lmaxmax=max(lmaxmax, lmax)
+        #Update values
+        upd[n,:]-=flux
+        # print(u[m-1, n+1])
+        # print(flux)
+        upd[n+1,:]+=flux
+        
+    cellf=mesh.cells[N-1]
+    v=zp(t_m)
+    # v=u[m-1, N-1, 1]/u[m-1, N-1, 0]
+    # v=cellf.vr
+    p=pf(w_m[N-1, 2], w_m[N-1, 0], v)
+    
+    force=w_m[N-1, 0]**2*cellf.volume*zpp(t_m)
+    flux=np.array([0, p-force, p*v])
+    upd[N-1,:]-=flux
+    return upd, lmaxmax
 def solve(N, M, T):
     mesh=Mesh(0., 1., N)
     dt=T/M
@@ -120,66 +161,72 @@ def solve(N, M, T):
     utot[0]=mesh.cells[0].volume*np.sum(u[0], axis=0)
     p[0]=pf(u[0,:,2], u[0,:,0], u[0,:,0]*u[0,:,1])
     for m in range(1, M+1):
-        print("m=", m)
+        lmaxmax=0
+        if m % 100==1:
+            print("m=", m)
         t=tvec[m]
-        upd=np.zeros((N, 3))
         
         
-        #Initilize the new values to the values at the previous time step
-        # u[m, :, :]=[u[m-1, k, :] for k in range(N)]
+        #Old Code
+        
+        # upd=np.zeros((N, 3))
         
         
-        cell0=mesh.cells[0]
-        # u[m, 0,:]+=dt*f_num(np.array([u[m-1, 0, 0], -u[m-1, 0, 1], u[m-1, 0, 2]]), u[m-1, 0], cell0.vl,1)/cell0.volume
-        # u[m, 0,:]+=dt*f(np.array([u[m-1, 0, 0], 0, u[m-1, 0, 2]]))/cell0.volume
-        # flux=np.array([0, p[m-1, 0], 0])
-        flux=np.array([0, (gamma-1)*u[m-1, 0, 2], 0])
-        upd[0,:]+=flux
-        # print((gamma-1)*u[m-1, 0, 2])
-        # print(flux)
-        #Loop over the edges
-        for n in range(N-1):
-            celll=mesh.cells[n]
-            cellr=mesh.cells[n+1]
-            #Approximate the flux by the numerical flux times the edge length
-            #Note that celll.vr=cellr.vl
-            # print("n=", n)
-            flux, lmax=f_num(u[m-1, n], u[m-1, n+1], celll.vr, 1)*1
-            #Update values
-            upd[n,:]-=flux
-            # print(u[m-1, n+1])
-            print(flux)
-            upd[n+1,:]+=flux
+        # cell0=mesh.cells[0]
+        # # u[m, 0,:]+=dt*f_num(np.array([u[m-1, 0, 0], -u[m-1, 0, 1], u[m-1, 0, 2]]), u[m-1, 0], cell0.vl,1)/cell0.volume
+        # # u[m, 0,:]+=dt*f(np.array([u[m-1, 0, 0], 0, u[m-1, 0, 2]]))/cell0.volume
+        # # flux=np.array([0, p[m-1, 0], 0])
+        # flux=np.array([0, (gamma-1)*u[m-1, 0, 2], 0])
+        # upd[0,:]+=flux
+        # # print((gamma-1)*u[m-1, 0, 2])
+        # # print(flux)
+        # #Loop over the edges
+        # # upd+=np.array([])
+        
+        # # upd[0:-1]-=np.array([f_num(u[m-1, n], u[m-1, n+1], mesh.cells[n].vr, 1)[0] for n in range(N-1)])
+        # # upd[1:]+=np.array([f_num(u[m-1, n], u[m-1, n+1], mesh.cells[n].vr, 1)[0] for n in range(N-1)])
+        # for n in range(N-1):
+        #     celll=mesh.cells[n]
+        #     cellr=mesh.cells[n+1]
+        #     #Approximate the flux by the numerical flux times the edge length
+        #     #Note that celll.vr=cellr.vl
+        #     # print("n=", n)
+        #     flux, lmax=f_num(u[m-1, n], u[m-1, n+1], celll.vr, 1)*1
+        #     lmaxmax=max(lmaxmax, lmax)
+        #     #Update values
+        #     upd[n,:]-=flux
+        #     # print(u[m-1, n+1])
+        #     # print(flux)
+        #     upd[n+1,:]+=flux
+            
+        # cellf=mesh.cells[N-1]
+        # v=zp(tvec[m-1])
+        # # v=u[m-1, N-1, 1]/u[m-1, N-1, 0]
+        # # v=cellf.vr
+        # p_t=pf(u[m-1, N-1, 2], u[m-1, N-1, 0], v)
+        # # print("pressure=", p_t)
+        
+        # force=u[m-1, N-1, 0]**2*cellf.volume*zpp(tvec[m-1])
+        # flux=np.array([0, p_t-force, p_t*v])
+        # # flux=np.array([0, -force, 0])
+        # # print(flux)
+        # upd[N-1,:]-=flux
+        
+        #New Code
+        v=zp(tvec[m-1])
+        a=zpp(tvec[m-1])
+        upd, lmax=step(mesh, u[m-1], tvec[m-1], v, a)
         cellf=mesh.cells[N-1]
-        # u[m, N-1,:]-=dt*f_num(u[m-1, N-1], u[m-1, N-1], cellf.vr,1)/cellf.volume
-        # u[m, N-1,:]-=dt*f(u[m-1, N-1])/cellf.volume
-        # u[m, N-1,:]-=dt*f(np.array([u[m-1, N-1, 0], mesh.cells[N-1].vr, u[m-1, N-1, 2]]))/cellf.volume
         
-        # u[m, 0, 1]=0
-        # u[m, N-1, 1]=0
-        # u[m, N-1,:]-=dt*f_num(u[m-1, N-1]-np.array([0, cellf.vr, 0]), np.array([u[m-1, N-1, 0], -u[m-1, N-1, 1], u[m-1, N-1, 2]]), cellf.vr, 1)/cellf.volume
-        # u[m, N-1, 1]=mesh.cells[N-1].vr
-        # u[m, N-1,:]-=dt*np.array([0, p[m-1, 0], p[m-1, 0]*cellf.vr])/cellf.volume
-        # u[m, N-1,:]-=dt*f(np.array([u[m-1, N-1, 0], u[m-1, N-1, 0]*cellf.vr, u[m-1, N-1, 2]]))/cellf.volume
-        # u[m, N-1,:]-=dt*ft(np.array([u[m-1, N-1, 0], cellf.vr*u[m-1, N-1, 0], u[m-1, N-1, 2]]), cellf.vr)/cellf.volume
-        
-        
-        # flux=ft(np.array([u[m-1, N-1, 0], cellf.vr*u[m-1, N-1, 0], u[m-1, N-1, 2]]), cellf.vr)
-        # # flux=np.array([0, (gamma-1)*u[m-1, N-1, 2], 0])
-        # print(flux)
-        p_t=(gamma-1)*u[m-1, N-1, 2]-0.5*(gamma-1)*u[m-1, N-1, 0]*np.abs(cellf.vr)**2
-        p_t=pf(u[m-1, N-1, 2], u[m-1, N-1, 0], cellf.vr)
-        # p_t=1
-        print("pressure=", p_t)
-        # u_t=np.array([u[m-1, N-1, 0], cellf.vr*u[m-1, N-1, 0], u[m-1, N-1, 2]])
-        # flux=cellf.vr*u_t+np.array([0, p_t, p_t*cellf.vr])
-        # print(flux)
-        
-        flux=np.array([0, p_t, p_t*cellf.vr])
-        # flux=np.array([0, (gamma-1)*u[m-1, N-1, 2], 0])
-        # flux[1]=15.85
-        print(flux)
-        upd[N-1,:]-=flux
+        dx=cellf.volume
+        # dt=dx/lmaxmax
+        # tvec[m]=tvec[m-1]+dt
+        cfl=dt/dx
+        # print("cfl=", lmaxmax*cfl)
+        # print("cfl=", cfl)
+        if cfl*lmaxmax>1:
+            print("CFL condition not satisfied")
+            
         
         #Initilize the new values to the values at the previous time step
         for k in range(N):
@@ -193,10 +240,9 @@ def solve(N, M, T):
         for k in range(N):
             u[m, k, :]/=mesh.cells[k].volume
         
-        print("Target velocity: ", zp(t))
-        print("Target velocity: ", cellf.vr)
-        print("Computed velocity: ", u[m, N-1, 1]/u[m, N-1, 0])
-        
+        # print("Target velocity: ", zp(t))
+        # print("Target velocity: ", cellf.vr)
+        # print("Computed velocity: ", u[m, N-1, 1]/u[m, N-1, 0])
         
         #Post computations
         utot[m]=mesh.cells[0].volume*np.sum(u[m], axis=0)
@@ -208,7 +254,75 @@ def solve(N, M, T):
         p[m]=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u1)**2
     return tvec, x, u, utot, p
         
-
+def adaptivesolve(M, tf, maxsteps=10000):
+    t0=0
+    N=maxsteps
+    
+    mesh=Mesh(0., 1., M)
+    x=np.zeros((N+1, M))
+    x[0,:]=mesh.midpoints()
+    
+    dt=np.zeros(N)
+    
+    t=np.zeros(N+1)
+    t[0]=t0
+    
+    w=np.zeros((N+1, M, 3))
+    w[0,:,0]=1
+    w[0,:,1]=0
+    w[0,:,2]=2.5
+    
+    p=np.zeros((N+1, M))
+    p[0]=pf(w[0,:,2], w[0,:,0], w[0,:,0]*w[0,:,1])
+    
+    wtot=np.zeros((N+1, 3))
+    wtot[0]=mesh.cells[0].volume*np.sum(w[0], axis=0)
+    n=1
+    while n<N+1 and t[n-1]<tf-10**(-15):
+        v=zp(t[n-1])
+        a=zpp(t[n-1])
+        upd, lmax=step(mesh, w[n-1], t[n-1], v, a)
+        
+        cellf=mesh.cells[M-1]
+        dx=cellf.volume
+        dt[n-1]=tf/10000
+        # dt[n-1]=dx/lmax
+        
+        t[n]=t[n-1]+dt[n-1]
+        print(t[n])
+        if t[n]>tf:
+            dt=dt[:n]
+            dt[n-1]=tf-t[n-1]
+            t=t[:n+1]
+            t[n]=tf
+            w=w[:n+1,:,:]
+            p=p[:n+1,]
+            wtot=wtot[:n+1,:]
+        #Initilize the new values to the values at the previous time step
+        for m in range(M):
+            w[n, m, :]=w[n-1, m, :]*mesh.cells[m].volume
+        #Calculate the new cell positions, velocities and volumes.
+        
+        mesh.update(z(t[n]), dt[n-1])
+        mid=mesh.midpoints()
+        x[n,:]=mesh.midpoints()
+        
+        w[n, :, :]+=dt[n-1]*upd
+        for m in range(M):
+            w[n, m, :]/=mesh.cells[m].volume
+        
+        
+        #Post computations
+        wtot[n]=mesh.cells[0].volume*np.sum(w[n], axis=0)
+        
+        rho=w[n, :, 0]
+        u1=w[n, :, 1]/rho
+        # v=np.array([(mesh.cells[k].vl+mesh.cells[k].vr)/2 for k in range(N)])
+        rhoE=w[n, :, 2]
+        p[n]=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u1)**2
+        
+        n=n+1
+    return w, x, t, dt, wtot, p
 # t=0
 # dt=0.1
 # T=5
@@ -237,29 +351,33 @@ def solve(N, M, T):
 
 # N=20
 # M=20000
-N=5
-M=2
-T=0.002
-t, x, w, wtot, p=solve(N, M, T)
-dt=T/M
-# fig, ax = plt.subplots()
-# xdata, ydata = [], []
-# ln0, = plt.plot([], [], 'r-')
-# ln1, = plt.plot([], [], 'g-')
-# ln2, = plt.plot([], [], 'b-')
-# ln3, = plt.plot([], [], 'k-')
+N=20
+M=10000
+T=1
+
+# t, x, w, wtot, p=solve(N, M, T)
+# dt=T/M
+
+w, x, t, dt, wtot, p=adaptivesolve(N, T)
+
+fig, ax = plt.subplots()
+xdata, ydata = [], []
+ln0, = plt.plot([], [], 'r-')
+ln1, = plt.plot([], [], 'g-')
+ln2, = plt.plot([], [], 'b-')
+ln3, = plt.plot([], [], 'k-')
 rho=w[:, :, 0]
 u=w[:, :, 1]/rho
 rhoE=w[:, :, 2]
 # p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
 
-plt.plot(t, wtot[:])
+# plt.plot(t, wtot[:])
 plt.legend(['rho', 'u', 'p'], loc='upper left')
 #Frames per second in video
 fps=60
 #Time units per second in video
 tps=3
-# time = plt.text(0.5,1.8, str(0), ha="left", va="top")
+time = plt.text(0.5,1.8, str(0), ha="left", va="top")
 
 def init():
     ax.set_xlim(0, 1.1)
@@ -291,10 +409,10 @@ def update(frame):
 # writergif = FFMpegWriter(fps=int(M/T/12), bitrate=-1)
 # ani.save(f, writer=writergif)
 
-# ani = FuncAnimation(fig, update, frames=np.array(tps*fps*T),
-#                     init_func=init, blit=True, repeat=True)
+ani = FuncAnimation(fig, update, frames=np.array(tps*fps*T),
+                    init_func=init, blit=True, repeat=True)
     
-# plt.show()
+plt.show()
 # f = "animation4.mp4" 
 # writergif = FFMpegWriter(fps=fps, bitrate=-1)
 # ani.save(f, writer=writergif)
