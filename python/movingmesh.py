@@ -44,9 +44,46 @@ class Mesh:
             self.cells[n].vl=diffl/dt
             self.cells[n].vr=diffr/dt
     def midpoints(self):
-        return np.array([self.cells[n].mid for n in range(N)])
+        return np.array([self.cells[n].mid for n in range(self.N)])
+# class Fluid:
+#     def __init__(self, mesh, maxsteps=10000):
+#         self.N=maxsteps
+#         self.M=M
+        
+#         self.mesh=Mesh(0., 1., M)
+#         self.x=np.zeros((N+1, M))
+#         self.x[0,:]=self.mesh.midpoints()
+        
+#         self.dt=np.zeros(N)
+        
+#         t0=0
+#         self.t=np.zeros(N+1)
+#         self.t[0]=t0
+        
+#         self.w=np.zeros((N+1, M, 3))
+#         self.w[0,:,0]=1
+#         self.w[0,:,1]=np.sin(np.pi*x[0])
+#         self.w[0,:,2]=2.5
+        
+#         self.p=np.zeros((N+1, M))
+#         self.p[0]=pf(w[0,:,2], w[0,:,0], w[0,:,0]*w[0,:,1])
+        
+#         #Boundary data (t, d, v, a)
+#         self.input=np.zeros((N+1, 4))
+        
+#         #Current step
+#         self.n=1
+#     def interpolateinput(self, s):
+#         #TODO
+#         d=0
+#         v=0
+#         a=0
+#         return np.array([d, v, a])
+#     def EEstep(self):
+#         return 0
+#     def output(self):
+#         return self.p[:self.n, self.M-1]
 gamma=7./5.
-c=1
 def pf(rhoE, rho, u):
     return (gamma-1)*(rhoE-0.5*rho*u**2)
 def z(t):
@@ -55,10 +92,12 @@ def zp(t):
     return -np.pi*np.sin(10*np.pi*t)
 def zpp(t):
     return -10*np.pi**2*np.cos(10*np.pi*t)
-# def z(t):
-#     return 1
-# def zp(t):
-#     return 0
+def z(t):
+    return 1
+def zp(t):
+    return 0
+def zpp(t):
+    return 0
 def f(w):
     rho=w[0]
     u=w[1]/rho
@@ -72,8 +111,10 @@ def ft(w, v):
     u=w[1]/rho
     rhou=w[1]
     rhoE=w[2]
-    # p=(gamma-1)*rhoE-0.5*(gamma-1)*rho*np.abs(u)**2
     p=pf(rhoE, rho, u)
+    # c=np.sqrt(gamma*p/rho)
+    # A=np.abs(np.array([u-v, u+c-v, u-c-v]))
+    # lmax=max(A)
     return w*(u-v)+np.array([0, p, p*u])
 def f_num(wl, wr, v, n):
     # print("flux")
@@ -99,12 +140,12 @@ def f_num(wl, wr, v, n):
     # print(abs(A))
     lamdamax=max(A)
     # print("lmax=", lamdamax)
-    fl=ft(wl, v)
-    fr=ft(wr, v)
+    # fl, lmaxl = ft(wl, v)
+    # fr, lmaxr =ft(wr, v)
     return 0.5*(ft(wl, v)+ft(wr, v))*n-0.5*lamdamax*(wr-wl)*n, lamdamax
 
-N=5
-M=1000
+# N=5
+# M=1000
 # mesh=Mesh(0., 1., N)
 def step(mesh, w_m, t_m, v_m, a_m):
     N=mesh.N
@@ -114,7 +155,7 @@ def step(mesh, w_m, t_m, v_m, a_m):
         
     cell0=mesh.cells[0]
     flux=np.array([0, (gamma-1)*w_m[0, 2], 0])
-    upd[0,:]+=flux
+    # upd[0,:]+=flux
     # print((gamma-1)*u[m-1, 0, 2])
     # print(flux)
     #Loop over the edges
@@ -142,9 +183,19 @@ def step(mesh, w_m, t_m, v_m, a_m):
     # v=cellf.vr
     p=pf(w_m[N-1, 2], w_m[N-1, 0], v)
     
-    force=w_m[N-1, 0]**2*cellf.volume*zpp(t_m)
-    flux=np.array([0, p-force, p*v])
-    upd[N-1,:]-=flux
+    rho=w_m[N-1,0]
+    c=np.sqrt(gamma*p/rho)
+    lmaxmax=max(lmaxmax, c)
+    
+    forcedensity=w_m[N-1, 0]*cellf.volume*zpp(t_m)
+    F=np.array([0, forcedensity, 0])
+    # print(F)
+    flux=np.array([0, p, p*v])
+    # flux, lmax=ft(w_m[N-1], v)
+    # lmaxmax=max(lmaxmax, lmax)
+    # print("flux=", flux)
+    # upd[N-1,:]-=flux
+    # upd[N-1,:]+=F
     return upd, lmaxmax
 def solve(N, M, T):
     mesh=Mesh(0., 1., N)
@@ -156,7 +207,8 @@ def solve(N, M, T):
     x=np.zeros((M+1, N))
     x[0,:]=mesh.midpoints()
     u[0,:,0]=1
-    u[0,:,1]=0
+    u[0,:,1]=np.sin(x[0])
+    # u[0,:,1]=0
     u[0,:,2]=2.5
     utot[0]=mesh.cells[0].volume*np.sum(u[0], axis=0)
     p[0]=pf(u[0,:,2], u[0,:,0], u[0,:,0]*u[0,:,1])
@@ -212,6 +264,8 @@ def solve(N, M, T):
         # # print(flux)
         # upd[N-1,:]-=flux
         
+        
+        
         #New Code
         v=zp(tvec[m-1])
         a=zpp(tvec[m-1])
@@ -219,11 +273,7 @@ def solve(N, M, T):
         cellf=mesh.cells[N-1]
         
         dx=cellf.volume
-        # dt=dx/lmaxmax
-        # tvec[m]=tvec[m-1]+dt
         cfl=dt/dx
-        # print("cfl=", lmaxmax*cfl)
-        # print("cfl=", cfl)
         if cfl*lmaxmax>1:
             print("CFL condition not satisfied")
             
@@ -269,6 +319,7 @@ def adaptivesolve(M, tf, maxsteps=10000):
     
     w=np.zeros((N+1, M, 3))
     w[0,:,0]=1
+    # w[0,:,1]=np.sin(np.pi*x[0])
     w[0,:,1]=0
     w[0,:,2]=2.5
     
@@ -285,11 +336,10 @@ def adaptivesolve(M, tf, maxsteps=10000):
         
         cellf=mesh.cells[M-1]
         dx=cellf.volume
-        dt[n-1]=tf/10000
-        # dt[n-1]=dx/lmax
+        # dt[n-1]=tf/10000
+        dt[n-1]=dx/lmax
         
         t[n]=t[n-1]+dt[n-1]
-        print(t[n])
         if t[n]>tf:
             dt=dt[:n]
             dt[n-1]=tf-t[n-1]
@@ -298,6 +348,7 @@ def adaptivesolve(M, tf, maxsteps=10000):
             w=w[:n+1,:,:]
             p=p[:n+1,]
             wtot=wtot[:n+1,:]
+        print("n=", n, ", t=", t[n])
         #Initilize the new values to the values at the previous time step
         for m in range(M):
             w[n, m, :]=w[n-1, m, :]*mesh.cells[m].volume
@@ -323,40 +374,59 @@ def adaptivesolve(M, tf, maxsteps=10000):
         
         n=n+1
     return w, x, t, dt, wtot, p
-# t=0
-# dt=0.1
-# T=5
-# M=100
-# dt=T/M
-# fig, ax = plt.subplots()
-# xdata, ydata = [], []
-# ln, = plt.plot([], [], 'ro')
 
-# def init():
-#     ax.set_xlim(0, 2.)
-#     ax.set_ylim(0, 2)
-#     return ln,
 
-# def update(frame):
-#     # plt.plot(mesh.midpoints(), np.ones(N), '*')
-#     ln.set_data(mesh.midpoints(), np.ones(N))
-#     t=dt*frame
-#     print(z(t))
-#     mesh.update(z(t), dt)
-#     return ln,
+def convtest():
+    #space
+    refNvec=np.array([10, 20])
+    for refN in refNvec:
+        T=1.
+        #time
+        refM=16000
+        t, x, refw, _, _=solve(refN, refM, T)
+        Mvec=np.array([125, 250, 500, 1000])
+        errvec=np.zeros(4)
+        for i in range(len(Mvec)):
+            M=Mvec[i]
+            t, x, w, _, _=solve(refN, M, T)
+            errvec[i]=np.linalg.norm(w[-1,:,:]-refw[-1,:,:])/np.sqrt(refN)
+        print("M=", refN)
+        print(errvec)
+        plt.plot(T/Mvec, errvec)
+        plt.xscale("log")
+        plt.yscale("log")
+    plt.legend(['M=10', 'M=20'])
+def convtest2():
+    T=1.
+    #space
+    refN=40
+    refMvec=[2000, 4000]
+    for refM in refMvec:
+        Nvec=np.array([5, 10, 20])
+        t, x, refw, _, _=solve(refN, refM, T)
+        errvec=np.zeros(len(Nvec))
+        for j in range(len(Nvec)):
+            N=Nvec[j]
+            #time
+            # t, x, refw, _, _=solve(refN, refM, T)
+            t, x, w, _, _=solve(N, refM, T)
+            errvec[j]=np.linalg.norm(w[-1,:,:]-refw[-1,::2**(len(Nvec)-j),:])/np.sqrt(N)
+        print("M=", N)
+        print(errvec)
+        plt.plot(T/Nvec, errvec)
+        plt.xscale("log")
+        plt.yscale("log")
+    plt.legend(['N=2000', 'N=4000'])
+# convtest2()
 
-# ani = FuncAnimation(fig, update, frames=np.linspace(0, 5, M),
-#                     init_func=init, blit=True)
-# plt.show()
-
-# N=20
-# M=20000
-N=20
-M=10000
-T=1
+N=320
+M=2
+# # N=100
+# # M=40
+T=5
 
 # t, x, w, wtot, p=solve(N, M, T)
-# dt=T/M
+# # dt=T/M
 
 w, x, t, dt, wtot, p=adaptivesolve(N, T)
 
@@ -371,7 +441,7 @@ u=w[:, :, 1]/rho
 rhoE=w[:, :, 2]
 # p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
 
-# plt.plot(t, wtot[:])
+plt.plot(t, wtot[:])
 plt.legend(['rho', 'u', 'p'], loc='upper left')
 #Frames per second in video
 fps=60
@@ -402,17 +472,11 @@ def update(frame):
     time.set_text(f't={tt:.2f}')
     return ln0, ln1, ln2, ln3, time
 
-# ani = FuncAnimation(fig, update, frames=np.array(range(M)),
-#                     init_func=init, blit=True, repeat=True)
-# plt.show()
-# f = "animation4.mp4" 
-# writergif = FFMpegWriter(fps=int(M/T/12), bitrate=-1)
-# ani.save(f, writer=writergif)
-
+        
 ani = FuncAnimation(fig, update, frames=np.array(tps*fps*T),
                     init_func=init, blit=True, repeat=True)
     
 plt.show()
-# f = "animation4.mp4" 
-# writergif = FFMpegWriter(fps=fps, bitrate=-1)
-# ani.save(f, writer=writergif)
+f = "animation4.mp4" 
+writergif = FFMpegWriter(fps=fps, bitrate=-1)
+ani.save(f, writer=writergif)
