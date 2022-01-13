@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import bisect
+
 # from scipy.optimize import newton
 
 def newton(g, dg, y0, eps, max_iter=50):
@@ -19,15 +21,82 @@ def newton(g, dg, y0, eps, max_iter=50):
     print('Exceeded maximum iterations. No solution found.')
     return yn
 
+def interpolate(t, f, s):
+    index=max(bisect.bisect_left(t, s)-1,0)
+    h=s-t[index]
+    return f[index]+(f[index+1]-f[index])/(t[index+1]-t[index])*(s-t[index])
 
+class Piston:
+    def __init__(self, y0, tp, maxsteps=50000):
+        N=self.N=maxsteps
+        self.h=np.zeros(N)
+        self.t=np.zeros(N)
+        self.y=np.zeros((N, 2))
+        self.y[0]=y0
+        self.tp=tp
+    def interpolateinput(self, t):
+        return interpolate(self.tp[0], self.tp[1], t)
+    def f(self, u, t): 
+        pt=self.interpolateinput(t)
+        # print(pt)
+        return np.array([u[1], -k/ms*u[0]+A*(p0-pt)])
+    def df(self, u, t):
+        return np.array([[0, 1], [-k/ms, 0]])
+    def IEstep(self, told, uold, dt):
+        def g(u):
+            return u-dt*self.f(u, told+dt)-uold
+        def dg(u):
+            return np.eye(np.size(uold))-dt*self.df(u, told+dt)
+        u= newton(g, dg, uold, 10**-14)
+        return u
+    def SDIRK12step(self, told, yold, dt):
+        S1=yold
+        Y1=self.IEstep(told+dt*alpha, S1, dt*alpha)
+        K1=self.f(Y1, told+dt*alpha)
+        S2=yold+dt*(1-alpha)*K1
+        Y2=self.IEstep(told+dt*alpha, S2, dt*alpha)
+        K2=self.f(Y2, told+dt)
+        ynew=S2+dt*alpha*K2
+        ytnew=yold+dt*bt1*K1+dt*bt2*K2
+        err=ynew-ytnew
+        return ynew, np.linalg.norm(err)
+
+    def SDIRK12int(self, te, tol):
+        N=self.N
+        self.h[0]=(te-self.t[0])*tol**(1/2)/(100*(1+np.linalg.norm(self.f(self.y[0], self.t[0]))))
+        self.t[0]=self.t[0]
+        errold=tol
+        err=errold
+        k=1
+        while k<N and self.t[k-1]<te-10**(-15):
+            errold=err
+            self.t[k]=self.t[k-1]+self.h[k-1]
+            if self.t[k]>te:
+                self.h=self.h[:k+1]
+                self.h[k-1]=te-self.t[k-1]
+                self.t=self.t[:k+1]
+                self.t[k]=te
+                self.y=self.y[:k+1]
+            unew, err = self.SDIRK12step(self.t[k-1], self.y[k-1], self.h[k-1])
+            self.y[k]=unew
+            # h[k]=newstep(tol, err, errold, h[k-1], 2)
+            self.h[k]=newstep(tol, err, self.h[k-1])
+            k=k+1
+    
+    def output(self):
+        # return np.stack((self.t, self.y[:,0], self.y[:,1]))
+        return
+            
+# def p(t):
+#     return 10**5+100*np.sin(10*np.pi*t)
 def p(t):
-    return 10**5+100*np.sin(10*np.pi*t)
+    return 1+0.01*np.sin(10*np.pi*t)
 p0=p(0)
 ms=100
 A=0.1
-k=50000
+k=5
 P=0.2
-k=ms/(P/2/np.pi)**2
+# k=ms/(P/2/np.pi)**2
 # k=10*np.pi**2*ms
 def f(u, t):
     return np.array([u[1], -k/ms*u[0]+A*(p0-p(t))])
@@ -79,23 +148,6 @@ def SDIRK12step(f, told, yold, dt):
     ytnew=yold+dt*bt1*K1+dt*bt2*K2
     err=ynew-ytnew
     return ynew, np.linalg.norm(err)
-#One step of RK4
-# def RK4step(f, told, uold, h):
-#     yp1=f(told, uold)
-#     yp2=f(told+h/2, uold+h*yp1/2)
-#     yp3=f(told+h/2, uold+h*yp2/2)
-#     yp4=f(told+h, uold+h*yp3)
-#     return uold+h/6*(yp1+2*yp2+2*yp3+yp4)
-# #One step of RK34, returns new value and norm of the local error estimate
-# def RK34step(f, told, uold, h):
-#     yp1=f(told, uold)
-#     yp2=f(told+h/2, uold+h*yp1/2)
-#     yp3=f(told+h/2, uold+h*yp2/2)
-#     zp3=f(told+h, uold-h*yp1+2*h*yp2)
-#     yp4=f(told+h, uold+h*yp3)
-#     l=h/6*(2*yp2+zp3-2*yp3-yp4)
-#     return uold+h/6*(yp1+2*yp2+2*yp3+yp4), norm(l)
-
 
 #EE integration
 def EEint(f, y0, t0, tf, N):
@@ -210,10 +262,18 @@ def SDIRK12int(f, y0, t0, tf, tol, maxsteps=500000):
 # t,u=SDIRK2int(f, np.array([0., 0.]), 0.0, 10., 1000)
 # plt.plot(t, u[:,0])
 
-t,u, h=SDIRK12int(f, np.array([0., 0.]), 0.0, 10., 10**-4)
+t,u, h=SDIRK12int(f, np.array([0., 0.]), 0.0, 10., 10**-2)
+
+# tp=np.array([np.linspace(0, 10., 10), p(np.linspace(0, 10., 10))])
+# piston=Piston(tp)
+# piston.SDIRK12int(np.array([0., 0.]), 0.0, 10., 10**-4)
+# t=piston.t
+# u=piston.y
+# h=piston.h
+
 plt.plot(t, u[:,0], label='u')
-# plt.plot(t, u[:,1], label='v')
-# plt.plot(t, 50*h, label='50h')
+plt.plot(t, u[:,1], label='v')
+plt.plot(t, 50*h, label='50h')
 plt.legend()
 
 
