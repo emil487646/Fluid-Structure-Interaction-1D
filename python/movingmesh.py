@@ -92,12 +92,12 @@ def zp(t):
     return -np.pi*np.sin(10*np.pi*t)
 def zpp(t):
     return -10*np.pi**2*np.cos(10*np.pi*t)
-def z(t):
-    return 1
-def zp(t):
-    return 0
-def zpp(t):
-    return 0
+# def z(t):
+#     return 1
+# def zp(t):
+#     return 0
+# def zpp(t):
+#     return 0
 def f(w):
     rho=w[0]
     u=w[1]/rho
@@ -155,7 +155,7 @@ def step(mesh, w_m, t_m, v_m, a_m):
         
     cell0=mesh.cells[0]
     flux=np.array([0, (gamma-1)*w_m[0, 2], 0])
-    # upd[0,:]+=flux
+    upd[0,:]+=flux
     # print((gamma-1)*u[m-1, 0, 2])
     # print(flux)
     #Loop over the edges
@@ -182,20 +182,22 @@ def step(mesh, w_m, t_m, v_m, a_m):
     # v=u[m-1, N-1, 1]/u[m-1, N-1, 0]
     # v=cellf.vr
     p=pf(w_m[N-1, 2], w_m[N-1, 0], v)
+    if p<0:
+        print("Negative pressure, p=", p)
     
     rho=w_m[N-1,0]
     c=np.sqrt(gamma*p/rho)
     lmaxmax=max(lmaxmax, c)
     
     forcedensity=w_m[N-1, 0]*cellf.volume*zpp(t_m)
-    F=np.array([0, forcedensity, 0])
+    F=np.array([0, forcedensity, v*forcedensity])
     # print(F)
     flux=np.array([0, p, p*v])
     # flux, lmax=ft(w_m[N-1], v)
     # lmaxmax=max(lmaxmax, lmax)
     # print("flux=", flux)
-    # upd[N-1,:]-=flux
-    # upd[N-1,:]+=F
+    upd[N-1,:]-=flux
+    upd[N-1,:]+=F
     return upd, lmaxmax
 def solve(N, M, T):
     mesh=Mesh(0., 1., N)
@@ -419,7 +421,7 @@ def convtest2():
     plt.legend(['N=2000', 'N=4000'])
 # convtest2()
 
-N=320
+N=160
 M=2
 # # N=100
 # # M=40
@@ -441,12 +443,12 @@ u=w[:, :, 1]/rho
 rhoE=w[:, :, 2]
 # p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
 
-plt.plot(t, wtot[:])
+# plt.plot(t, wtot[:])
 plt.legend(['rho', 'u', 'p'], loc='upper left')
 #Frames per second in video
 fps=60
 #Time units per second in video
-tps=3
+tps=12
 time = plt.text(0.5,1.8, str(0), ha="left", va="top")
 
 def init():
