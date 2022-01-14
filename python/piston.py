@@ -34,14 +34,22 @@ class Piston:
         self.y=np.zeros((N, 2))
         self.y[0]=y0
         self.tp=tp
+        
+        self.p0=2
+        self.ms=100
+        self.A=0.1
+        self.k=500
     def interpolateinput(self, t):
         return interpolate(self.tp[0], self.tp[1], t)
+    def F(self, t):
+        t=min(t, np.pi)
+        return 100*np.sin(t)
     def f(self, u, t): 
         pt=self.interpolateinput(t)
         # print(pt)
-        return np.array([u[1], -k/ms*u[0]+A*(p0-pt)])
+        return np.array([u[1], -self.k/self.ms*u[0]+self.A*(self.p0-pt)-self.F(t)/self.ms])
     def df(self, u, t):
-        return np.array([[0, 1], [-k/ms, 0]])
+        return np.array([[0, 1], [-self.k/self.ms, 0]])
     def IEstep(self, told, uold, dt):
         def g(u):
             return u-dt*self.f(u, told+dt)-uold
@@ -63,7 +71,7 @@ class Piston:
 
     def SDIRK12int(self, te, tol):
         N=self.N
-        self.h[0]=(te-self.t[0])*tol**(1/2)/(100*(1+np.linalg.norm(self.f(self.y[0], self.t[0]))))
+        self.h[0]=tol#(te-self.t[0])*tol**(1/2)/(100*(1+np.linalg.norm(self.f(self.y[0], self.t[0]))))
         self.t[0]=self.t[0]
         errold=tol
         err=errold
@@ -84,18 +92,18 @@ class Piston:
             k=k+1
     
     def output(self):
-        # return np.stack((self.t, self.y[:,0], self.y[:,1]))
-        return
+        a=np.array([self.f(self.y[n], self.t[n])[1] for n in range(len(self.t))])
+        return np.stack((self.t, self.y[:,0], self.y[:,1], a))
             
 # def p(t):
 #     return 10**5+100*np.sin(10*np.pi*t)
-def p(t):
-    return 1+0.01*np.sin(10*np.pi*t)
-p0=p(0)
-ms=100
-A=0.1
-k=5
-P=0.2
+# def p(t):
+#     return 2+0.01*np.sin(10*np.pi*t)
+# p0=p(0)
+# ms=100
+# A=0.1
+# k=500
+# P=0.2
 # k=ms/(P/2/np.pi)**2
 # k=10*np.pi**2*ms
 def f(u, t):
@@ -262,7 +270,7 @@ def SDIRK12int(f, y0, t0, tf, tol, maxsteps=500000):
 # t,u=SDIRK2int(f, np.array([0., 0.]), 0.0, 10., 1000)
 # plt.plot(t, u[:,0])
 
-t,u, h=SDIRK12int(f, np.array([0., 0.]), 0.0, 10., 10**-2)
+# t,u, h=SDIRK12int(f, np.array([0., 0.]), 0.0, 10., 10**-2)
 
 # tp=np.array([np.linspace(0, 10., 10), p(np.linspace(0, 10., 10))])
 # piston=Piston(tp)
@@ -271,10 +279,10 @@ t,u, h=SDIRK12int(f, np.array([0., 0.]), 0.0, 10., 10**-2)
 # u=piston.y
 # h=piston.h
 
-plt.plot(t, u[:,0], label='u')
-plt.plot(t, u[:,1], label='v')
-plt.plot(t, 50*h, label='50h')
-plt.legend()
+# plt.plot(t, u[:,0], label='u')
+# plt.plot(t, u[:,1], label='v')
+# plt.plot(t, 50*h, label='50h')
+# plt.legend()
 
 
 def errortest():

@@ -97,6 +97,10 @@ class Fluid:
         self.w[0,:,1]=0#np.sin(np.pi*self.x[0])
         self.w[0,:,2]=2.5
         
+        
+        self.wtot=np.zeros((N+1, 3))
+        self.wtot[0]=self.mesh.cells[0].volume*np.sum(self.w[0], axis=0)
+        
         self.pr=np.zeros(N+1)
         self.p=np.zeros((N+1, M))
         self.p[0]=pf(self.w[0,:,2], self.w[0,:,0], self.w[0,:,0]*self.w[0,:,1])
@@ -199,12 +203,14 @@ class Fluid:
                 self.t=self.t[:n+2]
                 self.t[n+1]=te
                 self.w=self.w[:n+2,:,:]
+                self.wtot=self.wtot[:n+2,:]
                 self.p=self.p[:n+2,:]
                 self.pr=self.pr[:n+2]
-            print("n=", n+1, ", t=", self.t[n+1])
+            # print("n=", n+1, ", t=", self.t[n+1])
             #Initilize the new values to the values at the previous time step
-            for m in range(M):
-                self.w[n+1, m, :]=self.w[n, m, :]*self.mesh.cells[m].volume
+            # for m in range(M):
+            #     self.w[n+1, m, :]=self.w[n, m, :]*self.mesh.cells[m].volume
+            self.w[n+1, :, :]=[self.w[n, m, :]*self.mesh.cells[m].volume for m in range(M)]
                 
             #Calculate the new cell positions, velocities and volumes.
             dva_np1=self.interpolateinput(self.t[n+1])
@@ -213,11 +219,13 @@ class Fluid:
             self.x[n+1,M+1]=self.mesh.cells[M-1].xr
             
             self.w[n+1, :, :]+=self.dt[n]*upd
-            for m in range(M):
-                self.w[n+1, m, :]/=self.mesh.cells[m].volume
+            # for m in range(M):
+            #     self.w[n+1, m, :]/=self.mesh.cells[m].volume
+            self.w[n+1, :, :]=[self.w[n+1, m, :]/self.mesh.cells[m].volume for m in range(M)]
             
             
             #Post computations
+            self.wtot[n]=self.mesh.cells[0].volume*np.sum(self.w[n], axis=0)
             
             rho=self.w[n+1, :, 0]
             u1=self.w[n+1, :, 1]/rho
@@ -566,15 +574,14 @@ def convtest2():
         plt.yscale("log")
     plt.legend(['N=2000', 'N=4000'])
 # convtest2()
-
-N=115
+N = 120
 # M=2
 # # N=100
 # # M=40
 T=5
 
 # t, x, w, wtot, p=solve(N, M, T)
-# # dt=T/M
+# dt=T/M
 
 # w, x, t, dt, wtot, p=adaptivesolve(N, T)
 
@@ -588,22 +595,22 @@ T=5
 
 # fig, ax = plt.subplots()
 # xdata, ydata = [], []
-# # ln0, = plt.plot([], [], 'r-')
-# # ln1, = plt.plot([], [], 'g-')
-# # ln2, = plt.plot([], [], 'b-')
-# # ln3, = plt.plot([], [], 'k-')
+# ln0, = plt.plot([], [], 'r-')
+# ln1, = plt.plot([], [], 'g-')
+# ln2, = plt.plot([], [], 'b-')
+# ln3, = plt.plot([], [], 'k-')
 # rho=w[:, :, 0]
 # u=w[:, :, 1]/rho
 # rhoE=w[:, :, 2]
 # # p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
 
-# plt.plot(t, wtot[:])
+# # plt.plot(t, wtot[:])
 # plt.legend(['rho', 'u', 'p'], loc='upper left')
 # #Frames per second in video
 # fps=60
 # #Time units per second in video
-# tps=12
-# # time = plt.text(0.5,1.8, str(0), ha="left", va="top")
+# tps=1
+# time = plt.text(0.5,1.8, str(0), ha="left", va="top")
 
 # def init():
 #     ax.set_xlim(0, 1.1)
@@ -633,6 +640,6 @@ T=5
 #                     init_func=init, blit=True, repeat=True)
     
 # plt.show()
-# f = "animation4.mp4" 
+# f = f"C:\\animation4.mp4" 
 # writergif = FFMpegWriter(fps=fps, bitrate=-1)
 # ani.save(f, writer=writergif)
