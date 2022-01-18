@@ -225,7 +225,7 @@ class Fluid:
             
             
             #Post computations
-            self.wtot[n]=self.mesh.cells[0].volume*np.sum(self.w[n], axis=0)
+            self.wtot[n+1]=self.mesh.cells[0].volume*np.sum(self.w[n+1], axis=0)
             
             rho=self.w[n+1, :, 0]
             u1=self.w[n+1, :, 1]/rho

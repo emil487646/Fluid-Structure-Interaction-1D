@@ -35,7 +35,7 @@ class Piston:
         self.y[0]=y0
         self.tp=tp
         
-        self.p0=2
+        self.p0=50
         self.ms=100
         self.A=0.1
         self.k=500
@@ -47,7 +47,7 @@ class Piston:
     def f(self, u, t): 
         pt=self.interpolateinput(t)
         # print(pt)
-        return np.array([u[1], -self.k/self.ms*u[0]+self.A*(self.p0-pt)-self.F(t)/self.ms])
+        return np.array([u[1], -self.k/self.ms*u[0]+self.A*(self.p0-pt)])
     def df(self, u, t):
         return np.array([[0, 1], [-self.k/self.ms, 0]])
     def IEstep(self, told, uold, dt):
@@ -59,10 +59,10 @@ class Piston:
         return u
     def SDIRK12step(self, told, yold, dt):
         S1=yold
-        Y1=self.IEstep(told+dt*alpha, S1, dt*alpha)
+        Y1=self.IEstep(told, S1, dt*alpha)
         K1=self.f(Y1, told+dt*alpha)
         S2=yold+dt*(1-alpha)*K1
-        Y2=self.IEstep(told+dt*alpha, S2, dt*alpha)
+        Y2=self.IEstep(told, S2, dt*alpha)
         K2=self.f(Y2, told+dt)
         ynew=S2+dt*alpha*K2
         ytnew=yold+dt*bt1*K1+dt*bt2*K2
@@ -95,27 +95,27 @@ class Piston:
         a=np.array([self.f(self.y[n], self.t[n])[1] for n in range(len(self.t))])
         return np.stack((self.t, self.y[:,0], self.y[:,1], a))
             
-# def p(t):
-#     return 10**5+100*np.sin(10*np.pi*t)
+def p(t):
+    return 10**5+100*np.sin(10*np.pi*t)
 # def p(t):
 #     return 2+0.01*np.sin(10*np.pi*t)
-# p0=p(0)
-# ms=100
-# A=0.1
-# k=500
-# P=0.2
-# k=ms/(P/2/np.pi)**2
+p0=p(0)
+ms=100
+A=0.1
+k=500
+P=0.2
+k=ms/(P/2/np.pi)**2
 # k=10*np.pi**2*ms
 def f(u, t):
     return np.array([u[1], -k/ms*u[0]+A*(p0-p(t))])
 def df(u, t):
     return np.array([[0, 1], [-k/ms, 0]])
-# def f(u, t):
-#     return np.array([u[0]])
-# def df(u, t):
-#     return np.array([[1.]])
-# def exact(t):
-#     return np.e**t
+def f(u, t):
+    return np.array([u[0]+1-t])
+def df(u, t):
+    return np.array([[1.]])
+def exact(t):
+    return np.e**t+t
 def EEstep(f, told, uold, dt):
     return uold+dt*f(uold, told)
 def IEstep(f, told, uold, dt):
