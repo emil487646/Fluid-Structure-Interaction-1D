@@ -38,7 +38,7 @@ class Piston:
         self.p0=50
         self.ms=100
         self.A=0.1
-        self.k=500
+        self.k=5000
     def interpolateinput(self, t):
         return interpolate(self.tp[0], self.tp[1], t)
     def F(self, t):
@@ -54,7 +54,7 @@ class Piston:
         def g(u):
             return u-dt*self.f(u, told+dt)-uold
         def dg(u):
-            return np.eye(np.size(uold))-dt*self.df(u, told+dt)
+            return np.eye(np.size   (uold))-dt*self.df(u, told+dt)
         u= newton(g, dg, uold, 10**-14)
         return u
     def SDIRK12step(self, told, yold, dt):
@@ -62,7 +62,7 @@ class Piston:
         Y1=self.IEstep(told, S1, dt*alpha)
         K1=self.f(Y1, told+dt*alpha)
         S2=yold+dt*(1-alpha)*K1
-        Y2=self.IEstep(told, S2, dt*alpha)
+        Y2=self.IEstep(told+dt*(1-alpha), S2, dt*alpha)
         K2=self.f(Y2, told+dt)
         ynew=S2+dt*alpha*K2
         ytnew=yold+dt*bt1*K1+dt*bt2*K2
@@ -138,19 +138,22 @@ bt1=1-alphat
 bt2=alphat
 def SDIRK2step(f, told, yold, dt):
     S1=yold
-    Y1=IEstep(f, told+dt*alpha, S1, dt*alpha)
-    K1=f(Y1, told+dt*alpha)
+    Y1=IEstep(f, told, S1, dt*alpha)
+    # K1=f(Y1, told+dt*alpha)
+    K1=(Y1-S1)/alpha/dt
     S2=yold+dt*(1-alpha)*K1
-    Y2=IEstep(f, told+dt*alpha, S2, dt*alpha)
+    Y2=IEstep(f, told+dt*(1-alpha), S2, dt*alpha)
     K2=f(Y2, told+dt)
+    # K2=(Y2-S2)/alpha/dt
     ynew=S2+dt*alpha*K2
     return ynew
 def SDIRK12step(f, told, yold, dt):
     S1=yold
     Y1=IEstep(f, told+dt*alpha, S1, dt*alpha)
     K1=f(Y1, told+dt*alpha)
+    # K1=(Y1-S1)/alpha/dt
     S2=yold+dt*(1-alpha)*K1
-    Y2=IEstep(f, told+dt*alpha, S2, dt*alpha)
+    Y2=IEstep(f, told+dt*(1-alpha), S2, dt*alpha)
     K2=f(Y2, told+dt)
     ynew=S2+dt*alpha*K2
     ytnew=yold+dt*bt1*K1+dt*bt2*K2
