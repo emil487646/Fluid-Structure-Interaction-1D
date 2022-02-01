@@ -11,7 +11,6 @@ from piston import Piston
 from piston import interpolate
 from movingmesh import Mesh
 from movingmesh import Fluid
-from movingmesh import step
 
 t0=0
 tol=10**-5
@@ -66,23 +65,23 @@ while err>tol/5 and it<maxits:
         print(err)
     it+=1
     
-
-errtvec=[None]*maxits
-errvec=errvec[:it-1]
-errtvec=errtvec[:it-1]
-tpf=tpf[:it]
-t=tpf[it-1][0,:]
-for i in range(it-1):
-    tp1=tpf[i]
-    tp2=tpf[it-1]
-    errtvec[i]=np.array([interpolate(tp1[0], tp1[1], tp2[0, k])-tp2[1, k] for k in range(len(tp2[0, :]))])
-    #     errtvec[i]=np.array([abs(interpolate(tp1[0], tp1[1], tp2[0, s])-tp2[0, s]) for s in len(range(tp2[0, :]))])
-for errt in errtvec[:6:2]:
-    plt.plot(t, errt)
-plt.yscale("log")
-plt.xlabel(r'$t$')
-plt.ylabel(r'$e_j(t)$')
-plt.legend([r'$e_1(t)$', r'$e_3(t)$', r'$e_5(t)$'], loc='upper left')
+#Plot error over time
+# errtvec=[None]*maxits
+# errvec=errvec[:it-1]
+# errtvec=errtvec[:it-1]
+# tpf=tpf[:it]
+# t=tpf[it-1][0,:]
+# for i in range(it-1):
+#     tp1=tpf[i]
+#     tp2=tpf[it-1]
+#     errtvec[i]=np.array([interpolate(tp1[0], tp1[1], tp2[0, k])-tp2[1, k] for k in range(len(tp2[0, :]))])
+#     #     errtvec[i]=np.array([abs(interpolate(tp1[0], tp1[1], tp2[0, s])-tp2[0, s]) for s in len(range(tp2[0, :]))])
+# for errt in errtvec[:6:2]:
+#     plt.plot(t, errt)
+# plt.yscale("log")
+# plt.xlabel(r'$t$')
+# plt.ylabel(r'$e_j(t)$')
+# plt.legend([r'$e_1(t)$', r'$e_3(t)$', r'$e_5(t)$'], loc='upper left')
 # errtvec=errtvec[:it-1]
 
 
@@ -96,14 +95,12 @@ rho=w[:, :, 0]
 u=w[:, :, 1]/rho
 rhoE=w[:, :, 2]
 
-# p=(gamma-1)*rhoE-0.5*rho*np.abs(u)**2
-
-#plot error
-# I=range(len(errvec))
-# plt.plot(I, errvec)
-# plt.yscale("log")
-# plt.xlabel('j')
-# plt.ylabel(r'$e_j^N$')
+# Plot error
+I=range(len(errvec))
+plt.plot(I, errvec)
+plt.yscale("log")
+plt.xlabel('j')
+plt.ylabel(r'$e_j^N$')
 
 #plot values at time t
 # i=340
